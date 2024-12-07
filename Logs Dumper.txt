@@ -1,0 +1,58 @@
+# Directory to store output
+$outputDir = "C:\Forensics"
+mkdir $outputDir -ErrorAction SilentlyContinue
+
+# Helper Function to Log Errors
+function Log-Error {
+    param([string]$message)
+    Add-Content -Path "$outputDir\errors.log" -Value $message
+}
+
+# Fetch Event Logs
+function Fetch-EventLogs {
+    $logs = @(
+        "Security",
+        "Application",
+        "System",
+        "Setup",
+        "Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational",
+        "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational",
+        "Microsoft-Windows-PowerShell/Operational",
+        "Microsoft-Windows-TaskScheduler/Operational",
+        "Microsoft-Windows-WMI-Activity/Operational",
+        "Microsoft-Windows-Sysmon/Operational"
+    )
+    foreach ($log in $logs) {
+        try {
+            $path = "$outputDir\$log.evtx".Replace("/", "_")
+            wevtutil epl $log $path
+        } catch {
+            Log-Error "Failed to fetch log: $log - $_"
+        }
+    }
+}
+
+# Copy Prefetch Files
+function Fetch-Prefetch {
+    try {
+        Copy-Item -Path "C:\Windows\Prefetch\*" -Destination "$outputDir\Prefetch" -Recurse -Force -ErrorAction Stop
+    } catch {
+        Log-Error "Failed to copy prefetch files - $_"
+    }
+}
+
+# Compress Results
+function Compress-Results {
+    try {
+        Compress-Archive -Path "$outputDir\*" -DestinationPath "$outputDir\ForensicsData.zip" -Force
+    } catch {
+        Log-Error "Failed to compress results - $_"
+    }
+}
+
+# Main Execution
+Fetch-EventLogs
+Fetch-Prefetch
+Compress-Results
+
+Write-Output "Data collection completed. Results saved to $outputDir"
