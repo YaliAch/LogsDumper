@@ -1,3 +1,5 @@
+#Visit Yali's Repo - github.com/YalisGod 
+
 # Directory to store output
 $outputDir = "C:\Forensics"
 mkdir $outputDir -ErrorAction SilentlyContinue
@@ -41,7 +43,7 @@ function Fetch-Prefetch {
     }
 }
 
-# Compress Results
+# Compress Results To ZIP
 function Compress-Results {
     try {
         Compress-Archive -Path "$outputDir\*" -DestinationPath "$outputDir\ForensicsData.zip" -Force
