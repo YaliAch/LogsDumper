@@ -1,0 +1,90 @@
+# Define output file
+$outputFile = "C:\Forensis\ThreatHuntingResults.csv"
+
+# Initialize CSV file
+"" | Out-File $outputFile
+
+# Function to write output to CSV
+function Write-ToCSV {
+    param (
+        [string]$QueryName,
+        [object]$Results
+    )
+    $Results | ForEach-Object {
+        [PSCustomObject]@{
+            Query       = $QueryName
+            Output      = $_
+        }
+    } | Export-Csv -Path $outputFile -Append -NoTypeInformation
+}
+
+# Query 1: List of users with administrative privileges
+$adminUsers = Get-LocalGroupMember -Group "Administrators" | Select-Object Name, PrincipalSource
+Write-ToCSV -QueryName "AdminUsers" -Results $adminUsers
+
+# Query 2: Suspicious processes
+$suspiciousProcesses = Get-Process | Where-Object { $_.Path -and ($_.Name -match "powershell|cmd|wmic|regsvr32|bitsadmin") } | Select-Object Name, Path, StartTime
+Write-ToCSV -QueryName "SuspiciousProcesses" -Results $suspiciousProcesses
+
+# Query 3: Open network connections
+$openConnections = Get-NetTCPConnection | Where-Object { $_.State -eq "Established" } | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort, State
+Write-ToCSV -QueryName "OpenNetworkConnections" -Results $openConnections
+
+# Query 4: Encoded command usage in PowerShell
+$encodedCommands = Get-WinEvent -LogName "Microsoft-Windows-PowerShell/Operational" | Where-Object { $_.Message -match "EncodedCommand" } | Select-Object TimeCreated, Message
+Write-ToCSV -QueryName "EncodedCommands" -Results $encodedCommands
+
+# Query 5: Startup programs
+$startupPrograms = Get-CimInstance -ClassName Win32_StartupCommand | Select-Object Name, Command, User
+Write-ToCSV -QueryName "StartupPrograms" -Results $startupPrograms
+
+# Query 6: Locked or disabled accounts
+$lockedAccounts = Search-ADAccount -LockedOut | Select-Object Name, LockedOut
+Write-ToCSV -QueryName "LockedAccounts" -Results $lockedAccounts
+$disabledAccounts = Search-ADAccount -Disabled | Select-Object Name, Enabled
+Write-ToCSV -QueryName "DisabledAccounts" -Results $disabledAccounts
+
+# Query 7: Recently modified files in TEMP folder
+$tempFiles = Get-ChildItem -Path $env:TEMP -Recurse | Where-Object { $_.LastWriteTime -gt (Get-Date).AddDays(-1) } | Select-Object FullName, LastWriteTime
+Write-ToCSV -QueryName "TempFolderFiles" -Results $tempFiles
+
+# Query 8: RDP connections
+$rdpConnections = Get-WinEvent -LogName "Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational" | Select-Object TimeCreated, Message
+Write-ToCSV -QueryName "RDPConnections" -Results $rdpConnections
+
+# Query 9: GPO changes
+$gpoChanges = Get-WinEvent -LogName "Security" -FilterXPath "*[System[EventID=5136]]" | Select-Object TimeCreated, Message
+Write-ToCSV -QueryName "GPOChanges" -Results $gpoChanges
+
+# Query 10: Services not running
+$stoppedServices = Get-Service | Where-Object { $_.Status -ne "Running" } | Select-Object Name, Status
+Write-ToCSV -QueryName "StoppedServices" -Results $stoppedServices
+
+# Query 11: Critical folder permission changes
+$criticalPaths = @("C:\Windows\System32", "C:\Program Files")
+$permissionsChanges = foreach ($path in $criticalPaths) {
+    Get-ChildItem -Path $path -Recurse -ErrorAction SilentlyContinue |
+    ForEach-Object {
+        $acl = Get-Acl $_.FullName
+        $acl.Access | Where-Object {
+            $_.FileSystemRights -match "FullControl" -and
+            $_.IdentityReference -notmatch "BUILTIN\\Administrators|NT AUTHORITY\\SYSTEM"
+        } | Select-Object @{Name="File";Expression={$_.FullName}}, @{Name="User";Expression={$_.IdentityReference}}, @{Name="Rights";Expression={$_.FileSystemRights}}
+    }
+}
+Write-ToCSV -QueryName "CriticalFolderPermissionChanges" -Results $permissionsChanges
+
+# Query 12: High memory usage processes
+$highMemoryProcesses = Get-Process | Sort-Object WorkingSet -Descending | Select-Object -First 10 Name, Id, @{Name="MemoryUsage(MB)";Expression={[math]::round($_.WorkingSet / 1MB, 2)}}
+Write-ToCSV -QueryName "HighMemoryProcesses" -Results $highMemoryProcesses
+
+# Query 13: New files in critical directories
+$newCriticalFiles = Get-ChildItem -Path "C:\Windows\System32" -Recurse -Filter "*.exe" | Where-Object { $_.CreationTime -gt (Get-Date).AddDays(-7) } | Select-Object FullName, CreationTime
+Write-ToCSV -QueryName "NewCriticalFiles" -Results $newCriticalFiles
+
+# Query 14: Unusual port connections
+$unusualPorts = Get-NetTCPConnection -State Established | Where-Object { $_.RemotePort -notin 80, 443, 53 } | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort, State
+Write-ToCSV -QueryName "UnusualPorts" -Results $unusualPorts
+
+# Notify user
+Write-Host "Threat Hunting queries completed. Results saved to $outputFile"
