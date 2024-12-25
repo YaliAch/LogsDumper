@@ -1,4 +1,4 @@
-#Visit Yali's Repo - github.com/YalisGod 
+#Visit Yali's Repo - github.com/YaliAch/LogsDumper
 
 # Directory to store output
 $outputDir = "C:\Forensics"
