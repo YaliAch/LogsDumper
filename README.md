@@ -27,3 +27,9 @@ This tool is designed to simplify the collection of key data, ensuring a compreh
 3. Paste the script into the PowerShell console and execute.
 
 **Note**: Pasting the script directly into the PowerShell console is recommended for better results, as some EDRs may block `.ps1` scripting files.
+
+
+
+## License
+
+[MIT License](LICENSE)
